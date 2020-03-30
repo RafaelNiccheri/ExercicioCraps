@@ -1,0 +1,355 @@
+import os
+import time
+from random import randint
+
+#definir estados
+estado_menu = (1<<0)
+estado_jogando = (1<<1)
+estado_derrota = (1<<2)
+
+#definir fases
+fase_comeout = (1<<3)
+fase_point = (1<<4)
+
+#definir apostas
+aposta_pass_line_bet = (1<<5)
+aposta_field = (1<<6)
+aposta_any_craps = (1<<7)
+aposta_twelve = (1<<8)
+
+#definir classe de jogador e suas propriedades
+class c_jogador:
+    #definir um construtor para a classe
+    def __init__(self, fichas):
+        self.fichas = fichas
+        self.flags = 0
+        self.flags |= fase_comeout
+        self.flags |= estado_menu
+
+#instanciar um jogador e definir 10 como sua quantidade de fichas iniciais
+jogador = c_jogador(10)
+
+#limpa o historico de mensagens no terminal
+#compativel somente com windows
+def limpar_historico():
+    os.system("cls")
+
+def atualizar_aposta(flag):
+    jogador.flags &= ~aposta_pass_line_bet
+    jogador.flags &= ~aposta_field
+    jogador.flags &= ~aposta_any_craps
+    jogador.flags &= ~aposta_twelve
+    
+    jogador.flags |= flag
+def atualizar_estado(flag):
+    jogador.flags &= ~estado_menu
+    jogador.flags &= ~estado_jogando
+    jogador.flags &= ~estado_derrota
+
+    jogador.flags |= flag
+def atualizar_fase(flag):
+    jogador.flags &= ~fase_comeout
+    jogador.flags &= ~fase_point
+
+    jogador.flags |= flag
+
+#retornar em string a fase em que o jogador esta no momento
+def fase():
+    if jogador.flags & fase_comeout: 
+        return 'Come Out'
+    else:
+        return 'Point'
+    return 'Invalida'
+#retornar uma array de fases disponiveis
+def apostas_disponiveis():
+    if jogador.flags & fase_comeout:
+        return ['Pass Line Bet', 'Field', 'Any Craps', 'Twelve']
+    else:
+        return ['Field', 'Any Craps', 'Twelve']
+#retornar uma string com a aposta atual
+def aposta_atual():
+    if jogador.flags & aposta_pass_line_bet:
+        return 'Pass Line Bet'
+    elif jogador.flags & aposta_field:
+        return 'Field'
+    elif jogador.flags & aposta_any_craps:
+        return 'Any Craps'
+    elif jogador.flags & aposta_twelve:
+        return 'Twelve'
+    else:
+        return 'Invalida'
+
+def menu_inicial():
+    #verificar se o usuario tem fichas e atualizar a flag estado
+    if jogador.fichas <= 0:
+        return derrota()
+
+    atualizar_estado(estado_menu)
+    limpar_historico()
+    print("CRAPS por Rafael Niccheri\n\n")
+    print('Fichas: ', jogador.fichas)
+    print('Fase: ', fase( ), "\n\n")
+    print("Apostas disponiveis: ")
+
+    #lista apostas disponiveis
+    indice = 0
+    for aposta in apostas_disponiveis():
+        indice += 1
+        print(indice, ":", aposta)
+
+    #definir flag de aposta
+    aposta = int(input("Escolha uma aposta: "))
+    if jogador.flags & fase_comeout:
+        if aposta > 4 or aposta < 1:
+            input("Aposta invalida, pressione enter para retornar...")
+            return menu_inicial()
+
+        flag = (1<<(aposta+4))
+        atualizar_aposta(flag)
+    else:
+        if aposta > 3 or aposta < 1:
+            input("Aposta invalida, pressione enter para retornar...")
+            return menu_inicial()
+
+        flag = (1<<aposta+5)
+        atualizar_aposta(flag)
+
+    #inciar aposta a partir da flag
+    if jogador.flags & aposta_pass_line_bet:
+        return pass_line_bet()
+    elif jogador.flags & aposta_field:
+        return field()
+    elif jogador.flags & aposta_any_craps:
+        return any_craps()
+    elif jogador.flags & aposta_twelve:
+        return twelve()
+    else:
+        #este codigo nao deve ser executado
+        input("Algo deu errado! Pressione enter para retornar...")
+        return menu_inicial()
+
+#verifica por valores em forma de array
+def check_for(check, values):
+    for value in values:
+        if check == value:
+            return 1
+    return 0
+
+def pass_line_bet():
+    #atualizar estado
+    atualizar_estado(estado_jogando)
+    limpar_historico()
+    print('Fichas: ', jogador.fichas)
+    print("Aposta: ", aposta_atual())
+
+    bet = int(input("Fichas para apostar: "))
+    if bet < 1 or bet > jogador.fichas:
+        input("Quantidade invalida de fichas para apostar! Pressione enter parar retornar...")
+        return pass_line_bet()
+
+    print("Lançando dados...\n")
+    time.sleep(1)
+    resultados = [randint(1, 6), randint(1,6)]
+    soma = resultados[0] + resultados[1]
+    
+    print("Dados: ")
+    for resultado in resultados:
+        print(resultado)
+
+    print("Soma:", soma, "\n")
+
+    if check_for(soma, [7, 11]):
+        #ganhar aposta*2
+        print("Parabens! Voce ganhou", bet*2, "fichas!")
+        jogador.fichas += bet*2
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+    elif check_for(soma, [2, 3, 12]):
+        #perder aposta
+        print("Craps! Voce perdeu", bet, "fichas!")
+        jogador.fichas -= bet
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+    elif check_for(soma, [4, 5, 6, 8, 9, 10]):
+        #fase point
+        print("\nVoce agora esta na fase Point!\n")
+        #atualizar flag de fase
+        atualizar_fase(fase_point)
+        time.sleep(0.5)
+        em_point = 1
+        #entrar em loop
+        while em_point == 1:
+            print("Point atual:", bet)
+            print("Lancando dados...\n")
+            time.sleep(1)
+            resultados = [randint(1, 6), randint(1,6)]
+            soma = resultados[0] + resultados[1]
+            print("Dados: ")
+            for resultado in resultados:
+                print(resultado)
+
+            print("Soma:", soma, "\n")
+            if check_for(soma, [7]):
+                #perder todas as fichas
+                print("Voce perdeu", jogador.fichas, "fichas!")
+                jogador.fichas = 0
+                em_point = 0
+                atualizar_fase(fase_comeout)
+                input("Pressione enter para retornar...")
+                return menu_inicial()
+            elif check_for(soma, [bet]):
+                #ganhar aposta
+                print("Parabens! Voce ganhou", bet, "fichas!")
+                jogador.fichas += bet
+                input("Pressione enter para retornar...")
+                em_point = 0
+                atualizar_fase(fase_comeout)
+                return menu_inicial()
+            else:
+                input("Pressione enter para lancar dados novamente...\n")
+
+    #este codigo nao deve ser executado
+    input("Algo deu errado! Pressione enter para retornar...")
+    return menu_inicial()
+
+def field():
+    #atualizar estado
+    atualizar_estado(estado_jogando)
+    limpar_historico()
+    print('Fichas: ', jogador.fichas)
+    print("Aposta: ", aposta_atual())
+    
+    bet = int(input("Fichas para apostar: "))
+    if bet < 1 or bet > jogador.fichas:
+        input("Quantidade invalida de fichas para apostar! Pressione enter parar retornar...")
+        return field()
+
+    print("Lançando dados...\n")
+    time.sleep(1)
+    resultados = [randint(1, 6), randint(1,6)]
+    soma = resultados[0] + resultados[1]
+    
+    print("Dados: ")
+    for resultado in resultados:
+        print(resultado)
+
+    print("Soma:", soma, "\n")
+
+    if check_for(soma, [5, 6, 7, 8]):
+        #perder tudo
+        print("Voce perdeu", jogador.fichas, "fichas!")
+        jogador.fichas = 0
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+    elif check_for(soma, [3, 4, 9, 10, 11]):
+        #ganhar aposta
+        print("Parabens! Voce ganhou", bet, "fichas!")
+        jogador.fichas += bet
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+    elif check_for(soma, [2]):
+        #ganhar aposta*2
+        print("Parabens! Voce ganhou", bet*2, "fichas!")
+        jogador.fichas += bet*2
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+    elif check_for(soma, [12]):
+        #ganhar aposta*3
+        print("Parabens! Voce ganhou", bet*3, "fichas!")
+        jogador.fichas += bet*3
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+
+    #este codigo nao deve ser executado
+    input("Algo deu errado! Pressione enter para retornar...")
+    return menu_inicial()
+
+def any_craps():
+    #atualizar estado
+    atualizar_estado(estado_jogando)
+    limpar_historico()
+    print('Fichas: ', jogador.fichas)
+    print("Aposta: ", aposta_atual())
+
+    bet = int(input("Fichas para apostar: "))
+    if bet < 1 or bet > jogador.fichas:
+        input("Quantidade invalida de fichas para apostar! Pressione enter parar retornar...")
+        return any_craps()
+
+    print("Lançando dados...\n")
+    time.sleep(1)
+    resultados = [randint(1, 6), randint(1,6)]
+    soma = resultados[0] + resultados[1]
+    
+    print("Dados: ")
+    for resultado in resultados:
+        print(resultado)
+
+    print("Soma:", soma, "\n")
+
+    if check_for(soma, [2, 3, 12]):
+        #ganhar aposta*7
+        print("Parabens! Voce ganhou", bet*7, "fichas!")
+        jogador.fichas += bet*7
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+    else:
+        #perder aposta
+        print("Voce perdeu", bet, "fichas!")
+        jogador.fichas -= bet
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+
+    #este codigo nao deve ser executado
+    input("Algo deu errado! Pressione enter para retornar...")
+    return menu_inicial()
+
+def twelve():
+    #atualizar estado
+    atualizar_estado(estado_jogando)
+    limpar_historico()
+    print('Fichas: ', jogador.fichas)
+    print("Aposta: ", aposta_atual())
+
+    bet = int(input("Fichas para apostar: "))
+    if bet < 1 or bet > jogador.fichas:
+        input("Quantidade invalida de fichas para apostar! Pressione enter parar retornar...")
+        return twelve()
+
+    print("Lançando dados...\n")
+    time.sleep(1)
+    resultados = [randint(1, 6), randint(1,6)]
+    soma = resultados[0] + resultados[1]
+    
+    print("Dados: ")
+    for resultado in resultados:
+        print(resultado)
+
+    print("Soma:", soma, "\n")
+
+    if check_for(soma, [12]):
+        #ganhar aposta*30
+        print("Parabens! Voce ganhou", bet*30, "fichas!")
+        jogador.fichas += bet*30
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+    else:
+        #perder aposta
+        print("Voce perdeu", bet, "fichas!")
+        jogador.fichas -= bet
+        input("Pressione enter para retornar...")
+        return menu_inicial()
+
+    #este codigo nao deve ser executado
+    input("Algo deu errado! Pressione enter para retornar...")
+    return menu_inicial()
+
+def derrota():
+    #atualizar estado
+    atualizar_estado(estado_derrota)
+    limpar_historico()
+    print("Suas fichas acabaram! Tente novamente...")
+    input("Pressione enter para retornar...")
+
+#chamar funcao inicial, sem utilizar loops
+menu_inicial()
